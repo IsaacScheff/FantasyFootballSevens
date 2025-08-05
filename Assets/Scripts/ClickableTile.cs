@@ -6,17 +6,11 @@ public class ClickableTile : MonoBehaviour {
     [HideInInspector] public Vector2Int coordinates;
 
     void Update() {
-        if (EventSystem.current == null) {
-            if (Input.GetMouseButtonDown(0))
-                TryHandleInput(Input.mousePosition);
-            return;
-        }
-
         if (Input.touchCount > 0) {
             Touch touch = Input.GetTouch(0);
-            if (touch.phase == TouchPhase.Began &&
-                !EventSystem.current.IsPointerOverGameObject(touch.fingerId)) {
-                TryHandleInput(touch.position);
+            if (touch.phase == TouchPhase.Began) {
+                if (!EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                    TryHandleInput(touch.position);
                 return;
             }
         }
