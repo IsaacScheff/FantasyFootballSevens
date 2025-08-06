@@ -1,19 +1,19 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System.Collections.Generic;
 
-public class ClickableTile : MonoBehaviour {
-    [HideInInspector] public Tile TileComponent;
+public class ClickablePlayer : MonoBehaviour {
+    [HideInInspector] public Tile Tile;
 
     void Update() {
         if (Input.touchCount > 0) {
-            Touch touch = Input.GetTouch(0);
+            var touch = Input.GetTouch(0);
             if (touch.phase == TouchPhase.Began) {
                 if (!EventSystem.current.IsPointerOverGameObject(touch.fingerId))
                     TryHandleInput(touch.position);
                 return;
             }
         }
-
         if (Input.GetMouseButtonDown(0) &&
             (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject()))
         {
@@ -27,12 +27,16 @@ public class ClickableTile : MonoBehaviour {
         if (hit.collider != null && hit.collider.gameObject == gameObject)
             HandleClick();
     }
+    public void HandleClick() {
+        Debug.Log($"Player clicked at world position {transform.position}");
 
-    void HandleClick() {
-        if (TileComponent.Occupant != null) {
-            TileComponent.Occupant.HandleClick();
-        } else {
-            Debug.Log($"Empty tile clicked");
-        }
+        var options = new List<OptionMenuManager.OptionData>() {
+            new OptionMenuManager.OptionData("Move", () =>
+                Debug.Log("Move selected")),
+            new OptionMenuManager.OptionData("Blitz", () =>
+                Debug.Log("Blitz selected")),
+        };
+        
+        OptionMenuManager.Instance.ShowMenu(transform.position, options);
     }
 }
