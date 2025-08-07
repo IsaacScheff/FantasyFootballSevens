@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 public class ClickablePlayer : MonoBehaviour {
     [HideInInspector] public Tile Tile;
+    [HideInInspector] public PlayerType PlayerType;
 
     void Update() {
         if (Input.touchCount > 0) {

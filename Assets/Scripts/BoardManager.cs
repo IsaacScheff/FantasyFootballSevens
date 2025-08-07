@@ -1,6 +1,8 @@
 using UnityEngine;
 
-public class BoardManager : MonoBehaviour {
+public class BoardManager : MonoBehaviour
+{
+    public static BoardManager Instance { get; private set; }
     public int columns = 20, rows = 11;
     public float tileSize = 1f;
     public Vector2 margin = Vector2.one;
@@ -10,41 +12,61 @@ public class BoardManager : MonoBehaviour {
 
     private Tile[,] grid;
 
-    void Start() {
+    void Awake()
+    {
+        if (Instance != null && Instance != this) Destroy(gameObject);
+        else Instance = this;
         grid = new Tile[columns, rows];
-        GenerateGrid();
-        SpawnPlayer(startingPlayerCoord);
     }
 
-    void GenerateGrid() {
+    void Start()
+    {
+        GenerateGrid();
+        PlayerFactory factory = FindObjectOfType<PlayerFactory>();
+        factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoord);
+    }
+
+    void GenerateGrid()
+    {
         Vector2 offset = new Vector2(
             -columns * tileSize * 0.5f + tileSize * 0.5f + margin.x,
             -rows * tileSize * 0.5f + tileSize * 0.5f + margin.y
         );
-
         for (int x = 0; x < columns; x++)
-        for (int y = 0; y < rows;    y++) {
-            Vector3 pos = new Vector3(
-                x * tileSize + offset.x,
-                y * tileSize + offset.y,
-                0f
-            );
-
-            GameObject go = Instantiate(tilePrefab, pos, Quaternion.identity, transform);
-            var tileComp = go.GetComponent<Tile>();
-            grid[x, y] = tileComp;
-
-            var ct = go.AddComponent<ClickableTile>();
-            ct.TileComponent = tileComp;
-        }
+            for (int y = 0; y < rows; y++)
+            {
+                Vector3 pos = new Vector3(
+                    x * tileSize + offset.x,
+                    y * tileSize + offset.y,
+                    0f
+                );
+                GameObject go = Instantiate(tilePrefab, pos, Quaternion.identity, transform);
+                Tile tileComp = go.GetComponent<Tile>();
+                grid[x, y] = tileComp;
+                ClickableTile ct = go.AddComponent<ClickableTile>();
+                ct.TileComponent = tileComp;
+            }
     }
 
-    void SpawnPlayer(Vector2Int coords) {
-        var tile = grid[coords.x, coords.y];
+    void SpawnPlayer(Vector2Int coords)
+    {
+        Tile tile = grid[coords.x, coords.y];
         Vector3 spawnPos = tile.transform.position;
         GameObject pl = Instantiate(playerPrefab, spawnPos, Quaternion.identity, transform);
-        var cp = pl.GetComponent<ClickablePlayer>();
+        ClickablePlayer cp = pl.GetComponent<ClickablePlayer>();
         cp.Tile = tile;
         tile.SetOccupant(cp);
     }
+
+    public Vector3 GetWorldPosition(Vector2Int coords)
+    {
+        if (coords.x < 0 || coords.x >= columns || coords.y < 0 || coords.y >= rows)
+            return Vector3.zero;
+        return grid[coords.x, coords.y].transform.position;
+    }
+    
+    public Tile GetTile(Vector2Int coords) {
+        return grid[coords.x, coords.y];
+    }
+
 }
