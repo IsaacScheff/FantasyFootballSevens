@@ -60,6 +60,7 @@ public class TurnManager : MonoBehaviour {
     }
 
     public void NextTurn() {
+        ResetActivations();
         coachTurn = !coachTurn;
         if (coachTurn) {
             turnInHalf++;
@@ -67,7 +68,6 @@ public class TurnManager : MonoBehaviour {
                 turnInHalf = 1;
                 half = Mathf.Clamp(half + 1, 1, 2);
             }
-            ResetActivations();
         }
         Notify();
     }
