@@ -4,10 +4,10 @@ using System;
 public class TurnManager : MonoBehaviour {
     public static TurnManager Instance { get; private set; }
 
-    [SerializeField] string coachTeamName = "Home";
-    [SerializeField] string aiTeamName = "Away";
-    [SerializeField] int coachScore = 0;
-    [SerializeField] int aiScore = 0;
+    [SerializeField] string homeTeamName = "Home";
+    [SerializeField] string awayTeamName = "Away";
+    [SerializeField] int homeScore = 0;
+    [SerializeField] int awayScore = 0;
     [SerializeField] int half = 1;
     [SerializeField] int turnInHalf = 1;
     [SerializeField] bool coachTurn = true;
@@ -23,23 +23,33 @@ public class TurnManager : MonoBehaviour {
         Notify();
     }
 
-    public string CoachTeamName => coachTeamName;
-    public string AITeamName => aiTeamName;
-    public int CoachScore => coachScore;
-    public int AIScore => aiScore;
+    public string HomeTeamName => homeTeamName;
+    public string AwayTeamName => awayTeamName;
+    public int HomeScore => homeScore;
+    public int AwayScore => awayScore;
     public int Half => half;
     public int TurnInHalf => turnInHalf;
     public bool IsCoachTurn => coachTurn;
 
-    public void SetTeamNames(string coach, string ai) {
-        coachTeamName = coach;
-        aiTeamName = ai;
+    public void SetTeamNames(string home, string away) {
+        homeTeamName = home;
+        awayTeamName = away;
         Notify();
     }
 
-    public void SetScore(int coach, int ai) {
-        coachScore = coach;
-        aiScore = ai;
+    public void SetScore(int home, int away) {
+        homeScore = home;
+        awayScore = away;
+        Notify();
+    }
+
+    public void AddHomeScore(int delta = 1) {
+        homeScore += delta;
+        Notify();
+    }
+
+    public void AddAwayScore(int delta = 1) {
+        awayScore += delta;
         Notify();
     }
 

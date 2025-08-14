@@ -2,9 +2,9 @@ using UnityEngine;
 using TMPro;
 
 public class ScoreboardUI : MonoBehaviour {
-    [SerializeField] TMP_Text homeNameText;
+    [SerializeField] TMP_Text homeTeamText;
     [SerializeField] TMP_Text homeScoreText;
-    [SerializeField] TMP_Text awayNameText;
+    [SerializeField] TMP_Text awayTeamText;
     [SerializeField] TMP_Text awayScoreText;
     [SerializeField] TMP_Text turnText;
 
@@ -20,10 +20,10 @@ public class ScoreboardUI : MonoBehaviour {
     public void Refresh() {
         var tm = TurnManager.Instance;
         if (tm == null) return;
-        if (homeNameText) homeNameText.text = tm.CoachTeamName;
-        if (awayNameText) awayNameText.text = tm.AITeamName;
-        if (homeScoreText) homeScoreText.text = tm.CoachScore.ToString();
-        if (awayScoreText) awayScoreText.text = tm.AIScore.ToString();
+        if (homeTeamText) homeTeamText.text = tm.HomeTeamName;
+        if (awayTeamText) awayTeamText.text = tm.AwayTeamName;
+        if (homeScoreText) homeScoreText.text = tm.HomeScore.ToString();
+        if (awayScoreText) awayScoreText.text = tm.AwayScore.ToString();
         if (turnText) turnText.text = tm.TurnLabel();
     }
 }
