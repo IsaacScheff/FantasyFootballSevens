@@ -1,7 +1,6 @@
 using UnityEngine;
 
-public class BoardManager : MonoBehaviour
-{
+public class BoardManager : MonoBehaviour {
     public static BoardManager Instance { get; private set; }
     public int columns = 20, rows = 11;
     public float tileSize = 1f;
@@ -12,44 +11,36 @@ public class BoardManager : MonoBehaviour
 
     private Tile[,] grid;
 
-    void Awake()
-    {
+    void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
         else Instance = this;
         grid = new Tile[columns, rows];
     }
 
-    void Start()
-    {
+    void Start() {
         GenerateGrid();
         PlayerFactory factory = FindObjectOfType<PlayerFactory>();
         factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoord);
     }
 
-    void GenerateGrid()
-    {
+    void GenerateGrid() {
         Vector2 offset = new Vector2(
             -columns * tileSize * 0.5f + tileSize * 0.5f + margin.x,
             -rows * tileSize * 0.5f + tileSize * 0.5f + margin.y
         );
         for (int x = 0; x < columns; x++)
-            for (int y = 0; y < rows; y++)
-            {
-                Vector3 pos = new Vector3(
-                    x * tileSize + offset.x,
-                    y * tileSize + offset.y,
-                    0f
-                );
-                GameObject go = Instantiate(tilePrefab, pos, Quaternion.identity, transform);
-                Tile tileComp = go.GetComponent<Tile>();
-                grid[x, y] = tileComp;
-                ClickableTile ct = go.AddComponent<ClickableTile>();
-                ct.TileComponent = tileComp;
-            }
+        for (int y = 0; y < rows;    y++) {
+            Vector3 pos = new Vector3(x * tileSize + offset.x, y * tileSize + offset.y, 0f);
+            GameObject go = Instantiate(tilePrefab, pos, Quaternion.identity, transform);
+            Tile tileComp = go.GetComponent<Tile>();
+            tileComp.SetCoords(x, y);
+            grid[x, y] = tileComp;
+            ClickableTile ct = go.AddComponent<ClickableTile>();
+            ct.TileComponent = tileComp;
+        }
     }
 
-    void SpawnPlayer(Vector2Int coords)
-    {
+    void SpawnPlayer(Vector2Int coords) {
         Tile tile = grid[coords.x, coords.y];
         Vector3 spawnPos = tile.transform.position;
         GameObject pl = Instantiate(playerPrefab, spawnPos, Quaternion.identity, transform);
@@ -58,15 +49,16 @@ public class BoardManager : MonoBehaviour
         tile.SetOccupant(cp);
     }
 
-    public Vector3 GetWorldPosition(Vector2Int coords)
-    {
-        if (coords.x < 0 || coords.x >= columns || coords.y < 0 || coords.y >= rows)
-            return Vector3.zero;
+    public Vector3 GetWorldPosition(Vector2Int coords) {
+        if (coords.x < 0 || coords.x >= columns || coords.y < 0 || coords.y >= rows) return Vector3.zero;
         return grid[coords.x, coords.y].transform.position;
     }
-    
+
     public Tile GetTile(Vector2Int coords) {
         return grid[coords.x, coords.y];
     }
 
+    public bool InBounds(Vector2Int c) {
+        return c.x >= 0 && c.x < columns && c.y >= 0 && c.y < rows;
+    }
 }

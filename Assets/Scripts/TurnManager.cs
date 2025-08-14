@@ -67,8 +67,14 @@ public class TurnManager : MonoBehaviour {
                 turnInHalf = 1;
                 half = Mathf.Clamp(half + 1, 1, 2);
             }
+            ResetActivations();
         }
         Notify();
+    }
+
+    void ResetActivations() {
+        var players = FindObjectsOfType<ClickablePlayer>();
+        foreach (var p in players) p.Activated = false;
     }
 
     void Notify() {
