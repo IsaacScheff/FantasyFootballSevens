@@ -17,9 +17,11 @@ public class MoveController : MonoBehaviour {
     }
 
     public void BeginMove(ClickablePlayer player) {
+        HideAllowed();
         selected = player;
         allowed = ComputeReachable(player.Tile, player.PlayerType.stats.Spd);
         OptionMenuManager.Instance.HideMenu();
+        ShowAllowed();
     }
 
     public void TrySelectTile(Tile tile) {
@@ -31,12 +33,21 @@ public class MoveController : MonoBehaviour {
         selected.Tile = tile;
         selected.transform.position = tile.transform.position;
         selected.Activated = true;
+        HideAllowed();
         Clear();
     }
 
     void Clear() {
         selected = null;
         allowed.Clear();
+    }
+
+    void ShowAllowed() {
+        foreach (var t in allowed) t.SetHighlight(true);
+    }
+
+    void HideAllowed() {
+        foreach (var t in allowed) t.SetHighlight(false);
     }
 
     HashSet<Tile> ComputeReachable(Tile start, int range) {
