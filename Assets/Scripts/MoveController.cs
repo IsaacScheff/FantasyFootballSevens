@@ -1,11 +1,15 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class MoveController : MonoBehaviour {
     public static MoveController Instance { get; private set; }
 
-    private ClickablePlayer selected;
-    private HashSet<Tile> allowed = new HashSet<Tile>();
+    ClickablePlayer selected;
+    HashSet<Tile> allowed = new HashSet<Tile>();
+    List<Tile> previewPath = new List<Tile>();
+    Tile previewDest;
+    int remainingSteps;
 
     void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
@@ -13,33 +17,59 @@ public class MoveController : MonoBehaviour {
     }
 
     public bool IsAwaitingMove {
-        get { return selected != null && allowed.Count > 0; }
+        get { return selected != null; }
     }
 
     public void BeginMove(ClickablePlayer player) {
-        HideAllowed();
+        Clear();
         selected = player;
-        allowed = ComputeReachable(player.Tile, player.PlayerType.stats.Spd);
+        remainingSteps = player.PlayerType.stats.Spd;
+        previewPath.Clear();
+        previewPath.Add(player.Tile);
         OptionMenuManager.Instance.HideMenu();
+        allowed = ComputeReachable(CurrentEnd(), remainingSteps);
         ShowAllowed();
     }
 
     public void TrySelectTile(Tile tile) {
         if (selected == null) return;
+
+        if (previewDest != null && tile == previewDest) {
+            StartCoroutine(MoveAlongPath(previewPath));
+            return;
+        }
+
         if (!allowed.Contains(tile)) return;
-        Tile from = selected.Tile;
-        from.SetOccupant(null);
-        tile.SetOccupant(selected);
-        selected.Tile = tile;
-        selected.transform.position = tile.transform.position;
-        selected.Activated = true;
+
+        var segment = ComputeShortestPath(CurrentEnd(), tile, remainingSteps);
+        if (segment == null || segment.Count <= 1) return;
+
+        for (int i = 1; i < segment.Count; i++) {
+            previewPath.Add(segment[i]);
+            segment[i].SetPathHighlight(true);
+        }
+        previewDest = tile;
+        remainingSteps -= (segment.Count - 1);
+
         HideAllowed();
-        Clear();
+        allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+        ShowAllowed();
     }
 
-    void Clear() {
-        selected = null;
-        allowed.Clear();
+    IEnumerator MoveAlongPath(List<Tile> path) {
+        HideAllowed();
+        for (int i = 1; i < path.Count; i++) {
+            Tile from = selected.Tile;
+            Tile to = path[i];
+            from.SetOccupant(null);
+            to.SetOccupant(selected);
+            selected.Tile = to;
+            selected.transform.position = to.transform.position;
+            yield return new WaitForSeconds(0.33f);
+        }
+        selected.Activated = true;
+        HidePath();
+        Clear();
     }
 
     void ShowAllowed() {
@@ -48,6 +78,25 @@ public class MoveController : MonoBehaviour {
 
     void HideAllowed() {
         foreach (var t in allowed) t.SetHighlight(false);
+    }
+
+    void HidePath() {
+        foreach (var t in previewPath) t.SetPathHighlight(false);
+        previewDest = null;
+    }
+
+    void Clear() {
+        HidePath();
+        HideAllowed();
+        selected = null;
+        allowed.Clear();
+        previewPath.Clear();
+        previewDest = null;
+        remainingSteps = 0;
+    }
+
+    Tile CurrentEnd() {
+        return previewPath.Count > 0 ? previewPath[previewPath.Count - 1] : null;
     }
 
     HashSet<Tile> ComputeReachable(Tile start, int range) {
@@ -67,6 +116,37 @@ public class MoveController : MonoBehaviour {
         }
         visited.Remove(start);
         return visited;
+    }
+
+    List<Tile> ComputeShortestPath(Tile start, Tile goal, int maxSteps) {
+        var parent = new Dictionary<Tile, Tile>();
+        var dist = new Dictionary<Tile, int>();
+        var q = new Queue<Tile>();
+        q.Enqueue(start);
+        dist[start] = 0;
+        while (q.Count > 0) {
+            var cur = q.Dequeue();
+            if (cur == goal) break;
+            foreach (var n in Neighbors(cur)) {
+                if (n.Occupant != null && n != goal) continue;
+                int nd = dist[cur] + 1;
+                if (nd > maxSteps) continue;
+                if (dist.ContainsKey(n)) continue;
+                dist[n] = nd;
+                parent[n] = cur;
+                q.Enqueue(n);
+            }
+        }
+        if (!dist.ContainsKey(goal)) return null;
+        var path = new List<Tile>();
+        var t = goal;
+        while (t != start) {
+            path.Add(t);
+            t = parent[t];
+        }
+        path.Add(start);
+        path.Reverse();
+        return path;
     }
 
     IEnumerable<Tile> Neighbors(Tile t) {
