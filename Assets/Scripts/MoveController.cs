@@ -50,16 +50,34 @@ public class MoveController : MonoBehaviour {
 
     public void OnTileClicked(Tile tile) {
         if (selected == null) return;
+
         if (previewDest != null && tile == previewDest) {
             StartCoroutine(MoveAlongPath(previewPath));
             return;
         }
+
+        int idx = previewPath.IndexOf(tile);
+        if (idx >= 0) {
+            for (int i = idx + 1; i < previewPath.Count; i++) previewPath[i].SetPathHighlight(false);
+            int used = previewPath.Count - 1;
+            int newUsed = idx;
+            remainingSteps += used - newUsed;
+            previewPath.RemoveRange(idx + 1, previewPath.Count - (idx + 1));
+            previewDest = previewPath.Count > 1 ? previewPath[previewPath.Count - 1] : null;
+            HideAllowed();
+            allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+            ShowAllowed();
+            return;
+        }
+
         if (!allowed.Contains(tile)) {
             CancelMove();
             return;
         }
+
         var segment = ComputeShortestPath(CurrentEnd(), tile, remainingSteps);
         if (segment == null || segment.Count <= 1) return;
+
         for (int i = 1; i < segment.Count; i++) {
             previewPath.Add(segment[i]);
             segment[i].SetPathHighlight(true);
