@@ -180,7 +180,12 @@ public class MoveController : MonoBehaviour {
     IEnumerable<Tile> Neighbors(Tile t) {
         var bm = BoardManager.Instance;
         var c = t.Coords;
-        var dirs = new Vector2Int[] { new Vector2Int(1,0), new Vector2Int(-1,0), new Vector2Int(0,1), new Vector2Int(0,-1) };
+        var dirs = new Vector2Int[] {
+            new Vector2Int(1,0), new Vector2Int(-1,0),
+            new Vector2Int(0,1), new Vector2Int(0,-1),
+            new Vector2Int(1,1), new Vector2Int(1,-1),
+            new Vector2Int(-1,1), new Vector2Int(-1,-1)
+        };
         foreach (var d in dirs) {
             var nc = c + d;
             if (bm.InBounds(nc)) yield return bm.GetTile(nc);
