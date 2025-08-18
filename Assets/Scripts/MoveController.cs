@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class MoveController : MonoBehaviour {
     public static MoveController Instance { get; private set; }
@@ -14,6 +15,22 @@ public class MoveController : MonoBehaviour {
     void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
         else Instance = this;
+    }
+
+    void Update() {
+        if (!IsAwaitingMove) return;
+        if (Input.touchCount > 0) {
+            var t = Input.GetTouch(0);
+            if (t.phase == TouchPhase.Began) {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(t.fingerId)) return;
+                if (!HitTileOrPlayer(t.position)) CancelMove();
+                return;
+            }
+        }
+        if (Input.GetMouseButtonDown(0) &&
+            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject())) {
+            if (!HitTileOrPlayer(Input.mousePosition)) CancelMove();
+        }
     }
 
     public bool IsAwaitingMove {
@@ -31,29 +48,31 @@ public class MoveController : MonoBehaviour {
         ShowAllowed();
     }
 
-    public void TrySelectTile(Tile tile) {
+    public void OnTileClicked(Tile tile) {
         if (selected == null) return;
-
         if (previewDest != null && tile == previewDest) {
             StartCoroutine(MoveAlongPath(previewPath));
             return;
         }
-
-        if (!allowed.Contains(tile)) return;
-
+        if (!allowed.Contains(tile)) {
+            CancelMove();
+            return;
+        }
         var segment = ComputeShortestPath(CurrentEnd(), tile, remainingSteps);
         if (segment == null || segment.Count <= 1) return;
-
         for (int i = 1; i < segment.Count; i++) {
             previewPath.Add(segment[i]);
             segment[i].SetPathHighlight(true);
         }
         previewDest = tile;
         remainingSteps -= (segment.Count - 1);
-
         HideAllowed();
         allowed = ComputeReachable(CurrentEnd(), remainingSteps);
         ShowAllowed();
+    }
+
+    public void CancelMove() {
+        Clear();
     }
 
     IEnumerator MoveAlongPath(List<Tile> path) {
@@ -69,7 +88,7 @@ public class MoveController : MonoBehaviour {
         }
         selected.Activated = true;
         HidePath();
-        Clear();
+        CancelMove();
     }
 
     void ShowAllowed() {
@@ -97,6 +116,15 @@ public class MoveController : MonoBehaviour {
 
     Tile CurrentEnd() {
         return previewPath.Count > 0 ? previewPath[previewPath.Count - 1] : null;
+    }
+
+    bool HitTileOrPlayer(Vector2 screenPos) {
+        Vector3 wp = Camera.main.ScreenToWorldPoint(screenPos);
+        RaycastHit2D hit = Physics2D.Raycast((Vector2)wp, Vector2.zero);
+        if (hit.collider == null) return false;
+        if (hit.collider.GetComponent<Tile>() != null) return true;
+        if (hit.collider.GetComponent<ClickablePlayer>() != null) return true;
+        return false;
     }
 
     HashSet<Tile> ComputeReachable(Tile start, int range) {

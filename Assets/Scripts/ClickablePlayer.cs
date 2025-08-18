@@ -41,6 +41,10 @@ public class ClickablePlayer : MonoBehaviour {
     }
 
     public void HandleClick() {
+        if (MoveController.Instance != null && MoveController.Instance.IsAwaitingMove) {
+            MoveController.Instance.CancelMove();
+            return;
+        }
         if (!TurnManager.Instance.IsCoachTurn) return;
         var options = new List<OptionMenuManager.OptionData>();
         if (!Activated && PlayerType != null) {
@@ -54,7 +58,7 @@ public class ClickablePlayer : MonoBehaviour {
     void ApplyActivationVisual() {
         if (sr == null) return;
         var c = sr.color;
-        c.a = activated ? 0.65f : 1f;
+        c.a = activated ? 0.5f : 1f;
         sr.color = c;
     }
 }

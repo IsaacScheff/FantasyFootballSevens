@@ -26,7 +26,7 @@ public class ClickableTile : MonoBehaviour {
 
     void HandleClick() {
         if (MoveController.Instance != null && MoveController.Instance.IsAwaitingMove) {
-            MoveController.Instance.TrySelectTile(TileComponent);
+            MoveController.Instance.OnTileClicked(TileComponent);
             return;
         }
         if (TileComponent.Occupant != null) {
