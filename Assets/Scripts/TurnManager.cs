@@ -20,6 +20,7 @@ public class TurnManager : MonoBehaviour {
     }
 
     void Start() {
+        ResetActivations();
         Notify();
     }
 
@@ -74,7 +75,10 @@ public class TurnManager : MonoBehaviour {
 
     void ResetActivations() {
         var players = FindObjectsOfType<ClickablePlayer>();
-        foreach (var p in players) p.Activated = false;
+        foreach (var p in players) {
+            p.Activated = false;
+            p.MoveLeft = p.PlayerType != null ? p.PlayerType.stats.Spd : 0;
+        }
     }
 
     void Notify() {
