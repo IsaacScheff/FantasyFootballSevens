@@ -11,6 +11,7 @@ public class MoveController : MonoBehaviour {
     List<Tile> previewPath = new List<Tile>();
     Tile previewDest;
     int remainingSteps;
+    int stepsMovedThisAction;
 
     void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
@@ -41,6 +42,7 @@ public class MoveController : MonoBehaviour {
         Clear();
         selected = player;
         remainingSteps = player.PlayerType.stats.Spd;
+        stepsMovedThisAction = 0;
         previewPath.Clear();
         previewPath.Add(player.Tile);
         OptionMenuManager.Instance.HideMenu();
@@ -90,11 +92,13 @@ public class MoveController : MonoBehaviour {
     }
 
     public void CancelMove() {
+        if (selected != null && stepsMovedThisAction > 0) selected.Activated = true;
         Clear();
     }
 
     IEnumerator MoveAlongPath(List<Tile> path) {
         HideAllowed();
+        int steps = path.Count - 1;
         for (int i = 1; i < path.Count; i++) {
             Tile from = selected.Tile;
             Tile to = path[i];
@@ -104,9 +108,19 @@ public class MoveController : MonoBehaviour {
             selected.transform.position = to.transform.position;
             yield return new WaitForSeconds(0.33f);
         }
-        selected.Activated = true;
+        stepsMovedThisAction += steps;
         HidePath();
-        CancelMove();
+
+        if (remainingSteps > 0) {
+            previewPath.Clear();
+            previewPath.Add(selected.Tile);
+            previewDest = null;
+            allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+            ShowAllowed();
+        } else {
+            selected.Activated = true;
+            CancelMove();
+        }
     }
 
     void ShowAllowed() {
@@ -130,6 +144,7 @@ public class MoveController : MonoBehaviour {
         previewPath.Clear();
         previewDest = null;
         remainingSteps = 0;
+        stepsMovedThisAction = 0;
     }
 
     Tile CurrentEnd() {

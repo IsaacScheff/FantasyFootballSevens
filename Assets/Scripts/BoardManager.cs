@@ -8,6 +8,7 @@ public class BoardManager : MonoBehaviour {
     public GameObject tilePrefab;
     public GameObject playerPrefab;
     public Vector2Int startingPlayerCoord = new Vector2Int(0, 0);
+    public Vector2Int startingPlayerCoordTwo = new Vector2Int(5, 5);
 
     private Tile[,] grid;
 
@@ -17,10 +18,12 @@ public class BoardManager : MonoBehaviour {
         grid = new Tile[columns, rows];
     }
 
-    void Start() {
+    void Start()
+    {
         GenerateGrid();
         PlayerFactory factory = FindObjectOfType<PlayerFactory>();
         factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoord);
+        factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoordTwo);
     }
 
     void GenerateGrid() {
