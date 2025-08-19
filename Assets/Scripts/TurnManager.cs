@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections.Generic;
 
 public class TurnManager : MonoBehaviour {
     public static TurnManager Instance { get; private set; }
@@ -12,6 +13,8 @@ public class TurnManager : MonoBehaviour {
     [SerializeField] int turnInHalf = 1;
     [SerializeField] bool coachTurn = true;
 
+    HashSet<ClickablePlayer> pendingUnstun = new HashSet<ClickablePlayer>();
+
     public event Action Changed;
 
     void Awake() {
@@ -20,7 +23,7 @@ public class TurnManager : MonoBehaviour {
     }
 
     void Start() {
-        ResetActivations();
+        StartCoachTurnSetup();
         Notify();
     }
 
@@ -61,7 +64,10 @@ public class TurnManager : MonoBehaviour {
     }
 
     public void NextTurn() {
-        ResetActivations();
+        if (coachTurn) {
+            foreach (var p in pendingUnstun) if (p != null) p.SetState(GroundState.Prone);
+            pendingUnstun.Clear();
+        }
         coachTurn = !coachTurn;
         if (coachTurn) {
             turnInHalf++;
@@ -69,15 +75,18 @@ public class TurnManager : MonoBehaviour {
                 turnInHalf = 1;
                 half = Mathf.Clamp(half + 1, 1, 2);
             }
+            StartCoachTurnSetup();
         }
         Notify();
     }
 
-    void ResetActivations() {
+    void StartCoachTurnSetup() {
         var players = FindObjectsOfType<ClickablePlayer>();
+        pendingUnstun.Clear();
         foreach (var p in players) {
             p.Activated = false;
             p.MoveLeft = p.PlayerType != null ? p.PlayerType.stats.Spd : 0;
+            if (p.State == GroundState.Stunned) pendingUnstun.Add(p);
         }
     }
 

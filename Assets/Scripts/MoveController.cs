@@ -9,8 +9,11 @@ public class MoveController : MonoBehaviour {
     ClickablePlayer selected;
     HashSet<Tile> allowed = new HashSet<Tile>();
     List<Tile> previewPath = new List<Tile>();
+    List<bool> previewStepIsDash = new List<bool>();
     Tile previewDest;
     int remainingSteps;
+    int dashLeft;
+    int dashUsedSoFar;
 
     void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
@@ -42,10 +45,19 @@ public class MoveController : MonoBehaviour {
         Clear();
         selected = player;
         remainingSteps = Mathf.Max(0, selected.MoveLeft);
+        dashLeft = 2;
+        dashUsedSoFar = 0;
+        if (selected.State == GroundState.Prone) {
+            if (remainingSteps < 3) { CancelMove(); return; }
+            selected.MoveLeft -= 3;
+            remainingSteps -= 3;
+            selected.SetState(GroundState.Standing);
+        }
         previewPath.Clear();
         previewPath.Add(player.Tile);
+        previewStepIsDash.Clear();
         OptionMenuManager.Instance.HideMenu();
-        allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+        allowed = ComputeReachable(CurrentEnd(), remainingSteps + dashLeft);
         ShowAllowed();
     }
 
@@ -53,20 +65,26 @@ public class MoveController : MonoBehaviour {
         if (selected == null) return;
 
         if (previewDest != null && tile == previewDest) {
-            StartCoroutine(MoveAlongPath(previewPath));
+            StartCoroutine(MoveAlongPath(previewPath, previewStepIsDash));
             return;
         }
 
         int idx = previewPath.IndexOf(tile);
         if (idx >= 0) {
             for (int i = idx + 1; i < previewPath.Count; i++) previewPath[i].SetPathHighlight(false);
-            int used = previewPath.Count - 1;
-            int newUsed = idx;
-            remainingSteps += used - newUsed;
+            int removed = previewPath.Count - 1 - idx;
+            int dashRemoved = 0;
+            int normalRemoved = 0;
+            for (int s = idx; s < previewStepIsDash.Count; s++) {
+                if (previewStepIsDash[s]) dashRemoved++; else normalRemoved++;
+            }
             previewPath.RemoveRange(idx + 1, previewPath.Count - (idx + 1));
+            previewStepIsDash.RemoveRange(idx, previewStepIsDash.Count - idx);
+            remainingSteps += normalRemoved;
+            dashLeft += dashRemoved;
             previewDest = previewPath.Count > 1 ? previewPath[previewPath.Count - 1] : null;
             HideAllowed();
-            allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+            allowed = ComputeReachable(CurrentEnd(), remainingSteps + dashLeft);
             ShowAllowed();
             return;
         }
@@ -76,17 +94,26 @@ public class MoveController : MonoBehaviour {
             return;
         }
 
-        var segment = ComputeShortestPath(CurrentEnd(), tile, remainingSteps);
+        var segment = ComputeShortestPath(CurrentEnd(), tile, remainingSteps + dashLeft);
         if (segment == null || segment.Count <= 1) return;
 
+        int steps = segment.Count - 1;
+        int useNormal = Mathf.Min(remainingSteps, steps);
+        int useDash = steps - useNormal;
+        if (useDash > dashLeft) return;
+
         for (int i = 1; i < segment.Count; i++) {
+            bool isDash = i > useNormal;
             previewPath.Add(segment[i]);
+            previewStepIsDash.Add(isDash);
             segment[i].SetPathHighlight(true);
         }
         previewDest = tile;
-        remainingSteps -= (segment.Count - 1);
+        remainingSteps -= useNormal;
+        dashLeft -= useDash;
+
         HideAllowed();
-        allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+        allowed = ComputeReachable(CurrentEnd(), remainingSteps + dashLeft);
         ShowAllowed();
     }
 
@@ -96,31 +123,56 @@ public class MoveController : MonoBehaviour {
         selected = null;
         allowed.Clear();
         previewPath.Clear();
+        previewStepIsDash.Clear();
         previewDest = null;
         remainingSteps = 0;
+        dashLeft = 0;
     }
 
-    IEnumerator MoveAlongPath(List<Tile> path) {
+    IEnumerator MoveAlongPath(List<Tile> path, List<bool> stepIsDash) {
         HideAllowed();
         int steps = path.Count - 1;
-        for (int i = 1; i < path.Count; i++) {
-            Tile from = selected.Tile;
+        int normalsExecuted = 0;
+        int dashesExecuted = 0;
+
+        for (int i = 1; i <= steps; i++) {
             Tile to = path[i];
+            bool isDash = stepIsDash[i - 1];
+
+            Tile from = selected.Tile;
             from.SetOccupant(null);
             to.SetOccupant(selected);
             selected.Tile = to;
             selected.transform.position = to.transform.position;
+
+            if (isDash) {
+                int threshold = (dashUsedSoFar + dashesExecuted == 0) ? 2 : 3;
+                int roll = Dice.D8();
+                if (roll < threshold) {
+                    ResolveFall(selected);
+                    HidePath();
+                    CancelMove();
+                    yield break;
+                }
+                dashesExecuted++;
+            } else {
+                normalsExecuted++;
+            }
+
             yield return new WaitForSeconds(0.33f);
         }
-        selected.MoveLeft = Mathf.Max(0, selected.MoveLeft - steps);
+
+        selected.MoveLeft = Mathf.Max(0, selected.MoveLeft - normalsExecuted);
+        dashUsedSoFar += dashesExecuted;
         HidePath();
 
-        if (selected.MoveLeft > 0) {
+        if (selected.MoveLeft > 0 || dashLeft > 0) {
             previewPath.Clear();
             previewPath.Add(selected.Tile);
+            previewStepIsDash.Clear();
             previewDest = null;
             remainingSteps = selected.MoveLeft;
-            allowed = ComputeReachable(CurrentEnd(), remainingSteps);
+            allowed = ComputeReachable(CurrentEnd(), remainingSteps + dashLeft);
             ShowAllowed();
         } else {
             selected.Activated = true;
@@ -147,8 +199,11 @@ public class MoveController : MonoBehaviour {
         selected = null;
         allowed.Clear();
         previewPath.Clear();
+        previewStepIsDash.Clear();
         previewDest = null;
         remainingSteps = 0;
+        dashLeft = 0;
+        dashUsedSoFar = 0;
     }
 
     Tile CurrentEnd() {
@@ -227,5 +282,22 @@ public class MoveController : MonoBehaviour {
             var nc = c + d;
             if (bm.InBounds(nc)) yield return bm.GetTile(nc);
         }
+    }
+
+    void ResolveFall(ClickablePlayer p) {
+        p.SetState(GroundState.Prone);
+        int armor = Dice.Roll2D6();
+        if (p.PlayerType != null && armor > p.PlayerType.stats.Con) {
+            int inj = Dice.Roll2D6();
+            if (inj <= 7) p.SetState(GroundState.Stunned);
+            else RemoveFromPitch(p);
+        }
+        p.Activated = true;
+    }
+
+    void RemoveFromPitch(ClickablePlayer p) {
+        Tile t = p.Tile;
+        if (t != null && t.Occupant == p) t.SetOccupant(null);
+        Destroy(p.gameObject);
     }
 }
