@@ -9,7 +9,16 @@ public class ClickablePlayer : MonoBehaviour {
     [HideInInspector] public PlayerType PlayerType;
 
     [SerializeField] bool activated;
-    public bool Activated {
+    [SerializeField] string displayName;
+    public string DisplayName {
+        get {
+            if (!string.IsNullOrEmpty(displayName)) return displayName;
+            if (PlayerType != null && !string.IsNullOrEmpty(PlayerType.typeName)) return PlayerType.typeName;
+            return "Player";
+        }
+    }
+    public bool Activated
+    {
         get { return activated; }
         set { activated = value; ApplyActivationVisual(); }
     }

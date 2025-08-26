@@ -4,7 +4,7 @@ public class BoardManager : MonoBehaviour {
     public static BoardManager Instance { get; private set; }
     public int columns = 20, rows = 11;
     public float tileSize = 1f;
-    public Vector2 margin = Vector2.one;
+    public Vector2 margin = Vector2.zero;
     public GameObject tilePrefab;
     public GameObject playerPrefab;
     public Vector2Int startingPlayerCoord = new Vector2Int(0, 0);
