@@ -14,6 +14,13 @@ public class MoveController : MonoBehaviour {
     int remainingSteps;
     int dashLeft;
     int dashUsedSoFar;
+    public bool IsAnimating { get; private set; }
+    public event System.Action<bool> AnimationStateChanged;
+    void SetAnimating(bool v) {
+        if (IsAnimating == v) return;
+        IsAnimating = v;
+        AnimationStateChanged?.Invoke(v);
+    }
 
     void Awake() {
         if (Instance != null && Instance != this) Destroy(gameObject);
@@ -116,21 +123,9 @@ public class MoveController : MonoBehaviour {
         ShowAllowed();
     }
 
-    public void CancelMove() {
-        HidePath();
-        HideAllowed();
-        selected = null;
-        allowed.Clear();
-        previewPath.Clear();
-        previewStepIsDash.Clear();
-        previewDest = null;
-        remainingSteps = 0;
-        dashLeft = 0;
-        dashUsedSoFar = 0;
-    }
-
     IEnumerator MoveAlongPath(List<Tile> path, List<bool> stepIsDash) {
         HideAllowed();
+        SetAnimating(true);
         int steps = path.Count - 1;
         int normalsExecuted = 0;
         int dashesExecuted = 0;
@@ -150,6 +145,7 @@ public class MoveController : MonoBehaviour {
                 int total = r + selected.PlayerType.stats.Dex - penalty;
                 GameLog.Instance?.Log($"{selected.DisplayName} dodge: d8 {r} + Dex {selected.PlayerType.stats.Dex} - EZ {penalty} = {total} {(total >= 9 ? "success" : "failure")}");
                 if (total < 9) {
+                    SetAnimating(false);
                     ResolveFall(selected);
                     HidePath();
                     CancelMove();
@@ -163,6 +159,7 @@ public class MoveController : MonoBehaviour {
                 int roll = Dice.D8();
                 GameLog.Instance?.Log($"{selected.DisplayName} dashes on {threshold}+, rolls {roll} {(roll >= threshold ? "success" : "failure")}");
                 if (roll < threshold) {
+                    SetAnimating(false);
                     ResolveFall(selected);
                     HidePath();
                     CancelMove();
@@ -179,6 +176,7 @@ public class MoveController : MonoBehaviour {
         selected.MoveLeft = Mathf.Max(0, selected.MoveLeft - normalsExecuted);
         dashUsedSoFar += dashesExecuted;
         HidePath();
+        SetAnimating(false);
 
         if (selected.MoveLeft > 0 || dashLeft > 0) {
             previewPath.Clear();
@@ -193,6 +191,23 @@ public class MoveController : MonoBehaviour {
             CancelMove();
         }
     }
+
+
+    public void CancelMove() {
+        HidePath();
+        HideAllowed();
+        SetAnimating(false);
+        selected = null;
+        allowed.Clear();
+        previewPath.Clear();
+        previewStepIsDash.Clear();
+        previewDest = null;
+        remainingSteps = 0;
+        dashLeft = 0;
+        dashUsedSoFar = 0;
+    }
+
+
 
     void ShowAllowed() {
         foreach (var t in allowed) t.SetHighlight(true);

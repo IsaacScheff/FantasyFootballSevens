@@ -63,9 +63,9 @@ public class ClickablePlayer : MonoBehaviour {
         RaycastHit2D hit = Physics2D.Raycast((Vector2)worldPt, Vector2.zero);
         if (hit.collider != null && hit.collider.gameObject == gameObject) HandleClick();
     }
-    
     public void HandleClick() {
         if (!TurnManager.Instance.IsCoachTurn) return;
+        if (MoveController.Instance != null && MoveController.Instance.IsAnimating) return;
         if (State == GroundState.Stunned) return;
 
         var options = new List<OptionMenuManager.OptionData>();
