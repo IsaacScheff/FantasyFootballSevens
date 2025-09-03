@@ -14,47 +14,59 @@ public class MoveController : MonoBehaviour {
     int remainingSteps;
     int dashLeft;
     int dashUsedSoFar;
+    readonly Color cRush = new Color(1f, 1f, 0f, 0.28f);
+    readonly Color cDodge = new Color(1f, 0.45f, 0.45f, 0.33f);
+    readonly Color cDodgeHeavy = new Color(0.85f, 0.2f, 0.2f, 0.38f);
     public bool IsAnimating { get; private set; }
     public event System.Action<bool> AnimationStateChanged;
-    void SetAnimating(bool v) {
+    void SetAnimating(bool v)
+    {
         if (IsAnimating == v) return;
         IsAnimating = v;
         AnimationStateChanged?.Invoke(v);
     }
 
-    void Awake() {
+    void Awake()
+    {
         if (Instance != null && Instance != this) Destroy(gameObject);
         else Instance = this;
     }
 
-    void Update() {
+    void Update()
+    {
         if (!IsAwaitingMove) return;
-        if (Input.touchCount > 0) {
+        if (Input.touchCount > 0)
+        {
             var t = Input.GetTouch(0);
-            if (t.phase == TouchPhase.Began) {
+            if (t.phase == TouchPhase.Began)
+            {
                 if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(t.fingerId)) return;
                 if (!HitTileOrPlayer(t.position)) CancelMove();
                 return;
             }
         }
         if (Input.GetMouseButtonDown(0) &&
-            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject())) {
+            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject()))
+        {
             if (!HitTileOrPlayer(Input.mousePosition)) CancelMove();
         }
     }
 
-    public bool IsAwaitingMove {
+    public bool IsAwaitingMove
+    {
         get { return selected != null; }
     }
 
-    public void BeginMove(ClickablePlayer player) {
+    public void BeginMove(ClickablePlayer player)
+    {
         if (selected != null && selected != player) selected.Activated = true;
         Clear();
         selected = player;
         remainingSteps = Mathf.Max(0, selected.MoveLeft);
         dashLeft = 2;
         dashUsedSoFar = 0;
-        if (selected.State == GroundState.Prone) {
+        if (selected.State == GroundState.Prone)
+        {
             if (remainingSteps < 3) { CancelMove(); return; }
             selected.MoveLeft -= 3;
             remainingSteps -= 3;
@@ -68,17 +80,20 @@ public class MoveController : MonoBehaviour {
         ShowAllowed();
     }
 
-    public void OnTileClicked(Tile tile) {
+    public void OnTileClicked(Tile tile)
+    {
         if (selected == null) return;
 
-        if (previewDest != null && tile == previewDest) {
+        if (previewDest != null && tile == previewDest)
+        {
             StartCoroutine(MoveAlongPath(previewPath, previewStepIsDash));
             return;
         }
 
         int idx = previewPath.IndexOf(tile);
         if (idx >= 0) {
-            for (int i = idx + 1; i < previewPath.Count; i++) previewPath[i].SetPathHighlight(false);
+            for (int i = idx + 1; i < previewPath.Count; i++) previewPath[i].SetPathState(Tile.PathKind.None);
+
             int dashRemoved = 0;
             int normalRemoved = 0;
             for (int s = idx; s < previewStepIsDash.Count; s++) {
@@ -112,8 +127,20 @@ public class MoveController : MonoBehaviour {
             bool isDash = i > useNormal;
             previewPath.Add(segment[i]);
             previewStepIsDash.Add(isDash);
-            segment[i].SetPathHighlight(true);
+
+            var from = segment[i - 1];
+            var to = segment[i];
+
+            bool requiresDodgeStep = CountAdjacentOpponents(from, selected) > 0;
+            int destAdj = CountAdjacentOpponents(to, selected);
+
+            Tile.PathKind pk = Tile.PathKind.Normal;
+            if (requiresDodgeStep) pk = destAdj > 0 ? Tile.PathKind.DodgeHeavy : Tile.PathKind.Dodge;
+            else if (isDash) pk = Tile.PathKind.Rush;
+
+            segment[i].SetPathState(pk);
         }
+
         previewDest = tile;
         remainingSteps -= useNormal;
         dashLeft -= useDash;
@@ -123,14 +150,16 @@ public class MoveController : MonoBehaviour {
         ShowAllowed();
     }
 
-    IEnumerator MoveAlongPath(List<Tile> path, List<bool> stepIsDash) {
+    IEnumerator MoveAlongPath(List<Tile> path, List<bool> stepIsDash)
+    {
         HideAllowed();
         SetAnimating(true);
         int steps = path.Count - 1;
         int normalsExecuted = 0;
         int dashesExecuted = 0;
 
-        for (int i = 1; i <= steps; i++) {
+        for (int i = 1; i <= steps; i++)
+        {
             Tile from = selected.Tile;
             Tile to = path[i];
 
@@ -139,12 +168,14 @@ public class MoveController : MonoBehaviour {
             selected.Tile = to;
             selected.transform.position = to.transform.position;
 
-            if (RequiresDodge(from, selected)) {
+            if (RequiresDodge(from, selected))
+            {
                 int penalty = CountAdjacentOpponents(to, selected);
                 int r = Dice.D8();
                 int total = r + selected.PlayerType.stats.Dex - penalty;
                 GameLog.Instance?.Log($"{selected.DisplayName} dodge: d8 {r} + Dex {selected.PlayerType.stats.Dex} - EZ {penalty} = {total} {(total >= 9 ? "success" : "failure")}");
-                if (total < 9) {
+                if (total < 9)
+                {
                     SetAnimating(false);
                     ResolveFall(selected);
                     HidePath();
@@ -207,22 +238,44 @@ public class MoveController : MonoBehaviour {
         dashUsedSoFar = 0;
     }
 
-
-
     void ShowAllowed() {
-        foreach (var t in allowed) t.SetHighlight(true);
+        var start = CurrentEnd();
+        var dists = ComputeDistances(start, remainingSteps + dashLeft);
+
+        foreach (var t in allowed) {
+            if (t.Occupant != null && t != start) continue;
+
+            int steps = dists.ContainsKey(t) ? dists[t] : remainingSteps;
+            bool needsDash = steps > remainingSteps;
+
+            bool dodgeOnFirstStep = false;
+            if (dists.ContainsKey(t) && dists[t] == 1) {
+                dodgeOnFirstStep = CountAdjacentOpponents(start, selected) > 0;
+            }
+
+            var kind = Tile.HighlightKind.Normal;
+            if (dodgeOnFirstStep) {
+                int destAdj = CountAdjacentOpponents(t, selected);
+                kind = destAdj > 0 ? Tile.HighlightKind.DodgeHeavy : Tile.HighlightKind.Dodge;
+            } else if (needsDash) {
+                kind = Tile.HighlightKind.Rush;
+            }
+
+            t.SetHighlightState(kind);
+        }
     }
 
     void HideAllowed() {
-        foreach (var t in allowed) t.SetHighlight(false);
+        foreach (var t in allowed) t.SetHighlightState(Tile.HighlightKind.None);
     }
 
     void HidePath() {
-        foreach (var t in previewPath) t.SetPathHighlight(false);
+        foreach (var t in previewPath) t.SetPathState(Tile.PathKind.None);
         previewDest = null;
     }
 
-    void Clear() {
+    void Clear()
+    {
         HidePath();
         HideAllowed();
         selected = null;
@@ -235,11 +288,13 @@ public class MoveController : MonoBehaviour {
         dashUsedSoFar = 0;
     }
 
-    Tile CurrentEnd() {
+    Tile CurrentEnd()
+    {
         return previewPath.Count > 0 ? previewPath[previewPath.Count - 1] : null;
     }
 
-    bool HitTileOrPlayer(Vector2 screenPos) {
+    bool HitTileOrPlayer(Vector2 screenPos)
+    {
         Vector3 wp = Camera.main.ScreenToWorldPoint(screenPos);
         RaycastHit2D hit = Physics2D.Raycast((Vector2)wp, Vector2.zero);
         if (hit.collider == null) return false;
@@ -248,15 +303,18 @@ public class MoveController : MonoBehaviour {
         return false;
     }
 
-    HashSet<Tile> ComputeReachable(Tile start, int range) {
+    HashSet<Tile> ComputeReachable(Tile start, int range)
+    {
         var visited = new HashSet<Tile>();
         var q = new Queue<(Tile t, int d)>();
         visited.Add(start);
         q.Enqueue((start, 0));
-        while (q.Count > 0) {
+        while (q.Count > 0)
+        {
             var cur = q.Dequeue();
             if (cur.d == range) continue;
-            foreach (var n in Neighbors(cur.t)) {
+            foreach (var n in Neighbors(cur.t))
+            {
                 if (visited.Contains(n)) continue;
                 if (n.Occupant != null && n != start) continue;
                 visited.Add(n);
@@ -267,16 +325,19 @@ public class MoveController : MonoBehaviour {
         return visited;
     }
 
-    List<Tile> ComputeShortestPath(Tile start, Tile goal, int maxSteps) {
+    List<Tile> ComputeShortestPath(Tile start, Tile goal, int maxSteps)
+    {
         var parent = new Dictionary<Tile, Tile>();
         var dist = new Dictionary<Tile, int>();
         var q = new Queue<Tile>();
         q.Enqueue(start);
         dist[start] = 0;
-        while (q.Count > 0) {
+        while (q.Count > 0)
+        {
             var cur = q.Dequeue();
             if (cur == goal) break;
-            foreach (var n in Neighbors(cur)) {
+            foreach (var n in Neighbors(cur))
+            {
                 if (n.Occupant != null && n != goal) continue;
                 int nd = dist[cur] + 1;
                 if (nd > maxSteps) continue;
@@ -289,7 +350,8 @@ public class MoveController : MonoBehaviour {
         if (!dist.ContainsKey(goal)) return null;
         var path = new List<Tile>();
         var t = goal;
-        while (t != start) {
+        while (t != start)
+        {
             path.Add(t);
             t = parent[t];
         }
@@ -298,7 +360,8 @@ public class MoveController : MonoBehaviour {
         return path;
     }
 
-    IEnumerable<Tile> Neighbors(Tile t) {
+    IEnumerable<Tile> Neighbors(Tile t)
+    {
         var bm = BoardManager.Instance;
         var c = t.Coords;
         var dirs = new Vector2Int[] {
@@ -307,37 +370,46 @@ public class MoveController : MonoBehaviour {
             new Vector2Int(1,1), new Vector2Int(1,-1),
             new Vector2Int(-1,1), new Vector2Int(-1,-1)
         };
-        foreach (var d in dirs) {
+        foreach (var d in dirs)
+        {
             var nc = c + d;
             if (bm.InBounds(nc)) yield return bm.GetTile(nc);
         }
     }
 
-    bool RequiresDodge(Tile from, ClickablePlayer mover) {
+    bool RequiresDodge(Tile from, ClickablePlayer mover)
+    {
         return CountAdjacentOpponents(from, mover) > 0;
     }
 
-    int CountAdjacentOpponents(Tile t, ClickablePlayer mover) {
+    int CountAdjacentOpponents(Tile t, ClickablePlayer mover)
+    {
         int c = 0;
-        foreach (var n in Neighbors(t)) {
+        foreach (var n in Neighbors(t))
+        {
             var occ = n.Occupant;
             if (occ != null && occ.Team != mover.Team) c++;
         }
         return c;
     }
 
-    void ResolveFall(ClickablePlayer p) {
+    void ResolveFall(ClickablePlayer p)
+    {
         p.SetState(GroundState.Prone);
         int a1, a2;
         int armor = Dice.Roll2D6(out a1, out a2);
         GameLog.Instance?.Log($"Armor roll for {p.DisplayName}: {a1} + {a2} = {armor} {(p.PlayerType != null && armor > p.PlayerType.stats.Con ? "— break" : "— no break")}");
-        if (p.PlayerType != null && armor > p.PlayerType.stats.Con) {
+        if (p.PlayerType != null && armor > p.PlayerType.stats.Con)
+        {
             int i1, i2;
             int inj = Dice.Roll2D6(out i1, out i2);
-            if (inj <= 7) {
+            if (inj <= 7)
+            {
                 p.SetState(GroundState.Stunned);
                 GameLog.Instance?.Log($"Injury roll for {p.DisplayName}: {i1} + {i2} = {inj} — stunned");
-            } else {
+            }
+            else
+            {
                 GameLog.Instance?.Log($"Injury roll for {p.DisplayName}: {i1} + {i2} = {inj} — removed");
                 RemoveFromPitch(p);
             }
@@ -345,9 +417,30 @@ public class MoveController : MonoBehaviour {
         p.Activated = true;
     }
 
-    void RemoveFromPitch(ClickablePlayer p) {
+    void RemoveFromPitch(ClickablePlayer p)
+    {
         Tile t = p.Tile;
         if (t != null && t.Occupant == p) t.SetOccupant(null);
         Destroy(p.gameObject);
+    }
+    
+    Dictionary<Tile,int> ComputeDistances(Tile start, int range) {
+        var dist = new Dictionary<Tile,int>();
+        var q = new Queue<Tile>();
+        dist[start] = 0;
+        q.Enqueue(start);
+        while (q.Count > 0) {
+            var cur = q.Dequeue();
+            int d = dist[cur];
+            if (d == range) continue;
+            foreach (var n in Neighbors(cur)) {
+                if (n.Occupant != null && n != start) continue;
+                if (dist.ContainsKey(n)) continue;
+                dist[n] = d + 1;
+                q.Enqueue(n);
+            }
+        }
+        dist.Remove(start);
+        return dist;
     }
 }
