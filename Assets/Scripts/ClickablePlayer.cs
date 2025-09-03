@@ -3,15 +3,19 @@ using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
 public enum GroundState { Standing, Prone, Stunned }
+public enum TeamSide { Home, Away }
 
 public class ClickablePlayer : MonoBehaviour {
     [HideInInspector] public Tile Tile;
     [HideInInspector] public PlayerType PlayerType;
-
     [SerializeField] bool activated;
     [SerializeField] string displayName;
-    public string DisplayName {
-        get {
+    [SerializeField] public TeamSide Team;
+
+    public string DisplayName
+    {
+        get
+        {
             if (!string.IsNullOrEmpty(displayName)) return displayName;
             if (PlayerType != null && !string.IsNullOrEmpty(PlayerType.typeName)) return PlayerType.typeName;
             return "Player";
@@ -59,12 +63,13 @@ public class ClickablePlayer : MonoBehaviour {
         RaycastHit2D hit = Physics2D.Raycast((Vector2)worldPt, Vector2.zero);
         if (hit.collider != null && hit.collider.gameObject == gameObject) HandleClick();
     }
-
+    
     public void HandleClick() {
         if (!TurnManager.Instance.IsCoachTurn) return;
         if (State == GroundState.Stunned) return;
+
         var options = new List<OptionMenuManager.OptionData>();
-        if (!Activated && PlayerType != null) {
+        if (!Activated && PlayerType != null && Team == TeamSide.Home) {
             options.Add(new OptionMenuManager.OptionData("Move", () => MoveController.Instance.BeginMove(this)));
         }
         if (options.Count > 0) {
@@ -72,7 +77,8 @@ public class ClickablePlayer : MonoBehaviour {
         }
     }
 
-    public void SetState(GroundState s) {
+    public void SetState(GroundState s)
+    {
         State = s;
         ApplyStateVisual();
     }

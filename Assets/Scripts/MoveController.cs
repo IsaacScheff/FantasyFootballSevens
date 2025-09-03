@@ -126,6 +126,7 @@ public class MoveController : MonoBehaviour {
         previewDest = null;
         remainingSteps = 0;
         dashLeft = 0;
+        dashUsedSoFar = 0;
     }
 
     IEnumerator MoveAlongPath(List<Tile> path, List<bool> stepIsDash) {
@@ -135,15 +136,28 @@ public class MoveController : MonoBehaviour {
         int dashesExecuted = 0;
 
         for (int i = 1; i <= steps; i++) {
-            Tile to = path[i];
-            bool isDash = stepIsDash[i - 1];
-
             Tile from = selected.Tile;
+            Tile to = path[i];
+
             from.SetOccupant(null);
             to.SetOccupant(selected);
             selected.Tile = to;
             selected.transform.position = to.transform.position;
 
+            if (RequiresDodge(from, selected)) {
+                int penalty = CountAdjacentOpponents(to, selected);
+                int r = Dice.D8();
+                int total = r + selected.PlayerType.stats.Dex - penalty;
+                GameLog.Instance?.Log($"{selected.DisplayName} dodge: d8 {r} + Dex {selected.PlayerType.stats.Dex} - EZ {penalty} = {total} {(total >= 9 ? "success" : "failure")}");
+                if (total < 9) {
+                    ResolveFall(selected);
+                    HidePath();
+                    CancelMove();
+                    yield break;
+                }
+            }
+
+            bool isDash = stepIsDash[i - 1];
             if (isDash) {
                 int threshold = (dashUsedSoFar + dashesExecuted == 0) ? 2 : 3;
                 int roll = Dice.D8();
@@ -282,6 +296,19 @@ public class MoveController : MonoBehaviour {
             var nc = c + d;
             if (bm.InBounds(nc)) yield return bm.GetTile(nc);
         }
+    }
+
+    bool RequiresDodge(Tile from, ClickablePlayer mover) {
+        return CountAdjacentOpponents(from, mover) > 0;
+    }
+
+    int CountAdjacentOpponents(Tile t, ClickablePlayer mover) {
+        int c = 0;
+        foreach (var n in Neighbors(t)) {
+            var occ = n.Occupant;
+            if (occ != null && occ.Team != mover.Team) c++;
+        }
+        return c;
     }
 
     void ResolveFall(ClickablePlayer p) {

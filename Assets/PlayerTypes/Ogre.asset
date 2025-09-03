@@ -16,7 +16,8 @@ MonoBehaviour:
   stats:
     Spd: 5
     Str: 5
-    Dex: 2
+    Dex: 5
     Kac: 2
     Con: 9
-  icon: {fileID: 21300000, guid: 7635a00991dda4d468bcca8e89b538da, type: 3}
+  redSprite: {fileID: 21300000, guid: 7635a00991dda4d468bcca8e89b538da, type: 3}
+  blueSprite: {fileID: 21300000, guid: a8f29286500e1466e9c6fb54bc14784c, type: 3}

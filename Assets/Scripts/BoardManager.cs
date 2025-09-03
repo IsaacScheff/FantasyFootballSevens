@@ -17,13 +17,18 @@ public class BoardManager : MonoBehaviour {
         else Instance = this;
         grid = new Tile[columns, rows];
     }
-
-    void Start()
-    {
+    void Start() {
+        grid = new Tile[columns, rows];
         GenerateGrid();
-        PlayerFactory factory = FindObjectOfType<PlayerFactory>();
-        factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoord);
-        factory.SpawnPlayer(factory.allTypes[0], startingPlayerCoordTwo);
+
+        var factory = FindObjectOfType<PlayerFactory>();
+        var type = factory.allTypes[0];
+
+        factory.SpawnPlayer(type, new Vector2Int(3, 5), TeamSide.Home);
+        factory.SpawnPlayer(type, new Vector2Int(5, 5), TeamSide.Home);
+
+        factory.SpawnPlayer(type, new Vector2Int(14, 5), TeamSide.Away);
+        factory.SpawnPlayer(type, new Vector2Int(16, 5), TeamSide.Away);
     }
 
     void GenerateGrid() {
